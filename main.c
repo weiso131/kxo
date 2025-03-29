@@ -77,7 +77,7 @@ static int major;
 static struct class *kxo_class;
 static struct cdev kxo_cdev;
 
-static char draw_buffer[DRAWBUFFER_SIZE];
+static char fast_buffer[N_GRIDS];
 
 /* Data are stored into a kfifo buffer before passing them to the userspace */
 static DECLARE_KFIFO_PTR(rx_fifo, unsigned char);
@@ -94,9 +94,9 @@ static DECLARE_WAIT_QUEUE_HEAD(rx_wait);
 /* Insert the whole chess board into the kfifo buffer */
 static void produce_board(void)
 {
-    unsigned int len = kfifo_in(&rx_fifo, draw_buffer, sizeof(draw_buffer));
-    if (unlikely(len < sizeof(draw_buffer)) && printk_ratelimit())
-        pr_warn("%s: %zu bytes dropped\n", __func__, sizeof(draw_buffer) - len);
+    unsigned int len = kfifo_in(&rx_fifo, fast_buffer, sizeof(fast_buffer));
+    if (unlikely(len < sizeof(fast_buffer)) && printk_ratelimit())
+        pr_warn("%s: %zu bytes dropped\n", __func__, sizeof(fast_buffer) - len);
 
     pr_debug("kxo: %s: in %u/%u bytes\n", __func__, len, kfifo_len(&rx_fifo));
 }
@@ -117,30 +117,9 @@ static struct circ_buf fast_buf;
 static char table[N_GRIDS];
 
 /* Draw the board into draw_buffer */
-static int draw_board(char *table)
+static int copy_to_buffer(char *table)
 {
-    int i = 0, k = 0;
-    draw_buffer[i++] = '\n';
-    smp_wmb();
-    draw_buffer[i++] = '\n';
-    smp_wmb();
-
-    while (i < DRAWBUFFER_SIZE) {
-        for (int j = 0; j < (BOARD_SIZE << 1) - 1 && k < N_GRIDS; j++) {
-            draw_buffer[i++] = j & 1 ? '|' : table[k++];
-            smp_wmb();
-        }
-        draw_buffer[i++] = '\n';
-        smp_wmb();
-        for (int j = 0; j < (BOARD_SIZE << 1) - 1; j++) {
-            draw_buffer[i++] = '-';
-            smp_wmb();
-        }
-        draw_buffer[i++] = '\n';
-        smp_wmb();
-    }
-
-
+    strncpy(fast_buffer, table, N_GRIDS);
     return 0;
 }
 
@@ -176,7 +155,7 @@ static void drawboard_work_func(struct work_struct *w)
     read_unlock(&attr_obj.lock);
 
     mutex_lock(&producer_lock);
-    draw_board(table);
+    copy_to_buffer(table);
     mutex_unlock(&producer_lock);
 
     /* Store data to the kfifo buffer */
@@ -347,7 +326,7 @@ static void timer_handler(struct timer_list *__timer)
             put_cpu();
 
             mutex_lock(&producer_lock);
-            draw_board(table);
+            copy_to_buffer(table);
             mutex_unlock(&producer_lock);
 
             /* Store data to the kfifo buffer */
