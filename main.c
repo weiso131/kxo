@@ -8,6 +8,7 @@
 #include <linux/slab.h>
 #include <linux/sysfs.h>
 #include <linux/version.h>
+#include <linux/vmalloc.h>
 #include <linux/workqueue.h>
 
 #include "game.h"
