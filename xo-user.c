@@ -52,6 +52,16 @@ static void raw_mode_enable(void)
 
 static bool read_attr, end_attr;
 
+static void reset_attr()
+{
+    int attr_fd = open(XO_DEVICE_ATTR_FILE, O_RDWR);
+    char attr_buf[6];
+    read(attr_fd, attr_buf, 6);
+    close(attr_fd);
+    read_attr = (attr_buf[0] - '0') && !(attr_buf[4] - '0');
+    end_attr = attr_buf[4] - '0';
+}
+
 static void listen_keyboard_handler(void)
 {
     int attr_fd = open(XO_DEVICE_ATTR_FILE, O_RDWR);
@@ -116,8 +126,8 @@ int main(int argc, char *argv[])
     int max_fd = device_fd > STDIN_FILENO ? device_fd : STDIN_FILENO;
     read_attr = true;
     end_attr = false;
-
     while (!end_attr) {
+        reset_attr();
         FD_ZERO(&readset);
         FD_SET(STDIN_FILENO, &readset);
         FD_SET(device_fd, &readset);
