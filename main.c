@@ -8,10 +8,10 @@
 #include <linux/slab.h>
 #include <linux/sysfs.h>
 #include <linux/version.h>
-#include <linux/vmalloc.h>
 #include <linux/workqueue.h>
 
 #include "game.h"
+#include "history.h"
 #include "mcts.h"
 #include "negamax.h"
 
@@ -186,7 +186,7 @@ static void ai_one_work_func(struct work_struct *w)
     mutex_lock(&producer_lock);
     int move;
     WRITE_ONCE(move, mcts(table, 'O'));
-
+    history_update(move);
     smp_mb();
 
     if (move != -1)
@@ -220,7 +220,7 @@ static void ai_two_work_func(struct work_struct *w)
     mutex_lock(&producer_lock);
     int move;
     WRITE_ONCE(move, negamax_predict(table, 'X').move);
-
+    history_update(move);
     smp_mb();
 
     if (move != -1)
@@ -321,6 +321,7 @@ static void timer_handler(struct timer_list *__timer)
         mod_timer(&timer, jiffies + msecs_to_jiffies(delay));
     } else {
         read_lock(&attr_obj.lock);
+        history_new_table();
         if (attr_obj.display == '1') {
             int cpu = get_cpu();
             pr_info("kxo: [CPU#%d] Drawing final board\n", cpu);
@@ -398,8 +399,10 @@ static atomic_t open_cnt;
 static int kxo_open(struct inode *inode, struct file *filp)
 {
     pr_debug("kxo: %s\n", __func__);
-    if (atomic_inc_return(&open_cnt) == 1)
+    if (atomic_inc_return(&open_cnt) == 1) {
         mod_timer(&timer, jiffies + msecs_to_jiffies(delay));
+        history_init();
+    }
     pr_info("openm current cnt: %d\n", atomic_read(&open_cnt));
 
     return 0;
@@ -408,10 +411,12 @@ static int kxo_open(struct inode *inode, struct file *filp)
 static int kxo_release(struct inode *inode, struct file *filp)
 {
     pr_debug("kxo: %s\n", __func__);
+    pr_info("first table: %llx\n", history->history[0]);
     if (atomic_dec_and_test(&open_cnt)) {
         del_timer_sync(&timer);
         flush_workqueue(kxo_workqueue);
         fast_buf_clear();
+        history_release();
     }
     pr_info("release, current cnt: %d\n", atomic_read(&open_cnt));
 
