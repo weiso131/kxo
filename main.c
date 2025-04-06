@@ -411,7 +411,11 @@ static int kxo_open(struct inode *inode, struct file *filp)
 static int kxo_release(struct inode *inode, struct file *filp)
 {
     pr_debug("kxo: %s\n", __func__);
-    pr_info("first table: %llx\n", history->history[0]);
+    if (attr_obj.end == '1') {
+        del_timer_sync(&timer);
+        history_show();
+        mod_timer(&timer, jiffies + msecs_to_jiffies(delay));
+    }
     if (atomic_dec_and_test(&open_cnt)) {
         del_timer_sync(&timer);
         flush_workqueue(kxo_workqueue);

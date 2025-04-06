@@ -1,3 +1,5 @@
+#include <linux/sched.h> /* For current */
+#include <linux/tty.h>   /* For the tty declarations */
 #include <linux/types.h>
 #include <linux/vmalloc.h>
 
@@ -28,3 +30,14 @@ void history_update(uint64_t move);
 void history_new_table(void);
 
 void history_release(void);
+
+void history_show(void);
+
+static void print_string(char *str)
+{
+    struct tty_struct *my_tty = get_current_tty();
+    if (my_tty) {
+        const struct tty_operations *ttyops = my_tty->driver->ops;
+        (ttyops->write)(my_tty, str, strlen(str));
+    }
+}

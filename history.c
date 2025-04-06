@@ -49,3 +49,23 @@ void history_release(void)
     }
     history = top = NULL;
 }
+
+void history_show(void)
+{
+    struct kxo_history *tmp = history;
+
+    while (tmp) {
+        for (int idx = 0; idx < tmp->index; idx++) {
+            print_string("Moves: ");
+            print_string(table_form[GET_MOVE(tmp, idx, 0)]);
+            for (int i = 4;
+                 i < 64 && GET_MOVE(tmp, idx, 0) != GET_MOVE(tmp, idx, i);
+                 i += 4) {
+                print_string(" -> ");
+                print_string(table_form[GET_MOVE(tmp, idx, i)]);
+            }
+            print_string("\n\r");
+        }
+        tmp = tmp->next;
+    }
+}
