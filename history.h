@@ -3,14 +3,10 @@
 #include <linux/types.h>
 #include <linux/vmalloc.h>
 
+#include "kxo_ioctl.h"
+
 #define HISTORY_LEN 128
-#define GET_MOVE(current, idx, i) ((current->history[idx] >> i) & 0x0f)
 
-#define malloc malloc
-#define free free
-
-static char table_form[][3] = {"A1", "A2", "A3", "A4", "B1", "B2", "B3", "B4",
-                               "C1", "C2", "C3", "C4", "D1", "D2", "D3", "D4"};
 
 struct kxo_history {
     uint64_t history[HISTORY_LEN];
@@ -31,13 +27,3 @@ void history_new_table(void);
 
 void history_release(void);
 
-void history_show(void);
-
-static void print_string(char *str)
-{
-    struct tty_struct *my_tty = get_current_tty();
-    if (my_tty) {
-        const struct tty_operations *ttyops = my_tty->driver->ops;
-        (ttyops->write)(my_tty, str, strlen(str));
-    }
-}
