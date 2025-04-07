@@ -1,14 +1,17 @@
 #include <fcntl.h>
 #include <getopt.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/ioctl.h>
 #include <sys/select.h>
 #include <termios.h>
 #include <unistd.h>
 
 #include "game.h"
+#include "kxo_ioctl.h"
 
 #define XO_STATUS_FILE "/sys/module/kxo/initstate"
 #define XO_DEVICE_FILE "/dev/kxo"
@@ -110,6 +113,32 @@ static int draw_board(char *table, char *draw_buffer)
     return 0;
 }
 
+
+struct history_data {
+    uint64_t table;
+    uintptr_t history;
+    int idx;
+};
+void show(int device_fd)
+{
+    struct history_data data = (struct history_data){0, 0, 0};
+
+    while (1) {
+        if (ioctl(device_fd, GET_HISTORY, &data) < 0) {
+            printf("error\n");
+            return;
+        }
+        if (data.table == 0xff)
+            break;
+        printf("Moves: %s", table_form[GET_MOVE(data.table, 0)]);
+        for (int i = 4;
+             i < 64 && GET_MOVE(data.table, 0) != GET_MOVE(data.table, i);
+             i += 4)
+            printf(" -> %s", table_form[GET_MOVE(data.table, i)]);
+        printf("\n");
+    }
+}
+
 int main(int argc, char *argv[])
 {
     if (!status_check())
@@ -150,6 +179,7 @@ int main(int argc, char *argv[])
         }
     }
 
+    show(device_fd);
     raw_mode_disable();
     fcntl(STDIN_FILENO, F_SETFL, flags);
 

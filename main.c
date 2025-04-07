@@ -359,6 +359,59 @@ static void timer_handler(struct timer_list *__timer)
     local_irq_enable();
 }
 
+struct history_data {
+    uint64_t table;
+    struct kxo_history *history;
+    int idx;
+};
+
+static long kxo_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
+{
+    del_timer_sync(&timer);
+    int ret = 0;
+    switch (cmd) {
+    case GET_HISTORY:
+        pr_info("get history\n");
+        struct history_data data;
+        if (copy_from_user(&data, (char __user *) arg, sizeof(data))) {
+            pr_info("copy_from_user error\n");
+            ret = -EFAULT;
+            goto done;
+        }
+        if (data.history == NULL) {
+            data.history = history;
+            data.idx = -1;
+        }
+
+        data.idx++;
+        if (data.idx == HISTORY_LEN) {
+            data.idx = 0;
+            data.history = data.history->next;
+        }
+        if (data.history == NULL || data.idx == data.history->index) {
+            data.table = 0xff;
+            goto get_history_done;
+        }
+
+        data.table = data.history->history[data.idx];
+
+    get_history_done:
+        if (copy_to_user((char __user *) arg, &data, sizeof(data))) {
+            pr_info("copy_to_user error\n");
+            ret = -EFAULT;
+            goto done;
+        }
+
+        break;
+    default:
+        break;
+    }
+
+done:
+    mod_timer(&timer, jiffies + msecs_to_jiffies(delay));
+    return ret;
+}
+
 static ssize_t kxo_read(struct file *file,
                         char __user *buf,
                         size_t count,
@@ -411,11 +464,6 @@ static int kxo_open(struct inode *inode, struct file *filp)
 static int kxo_release(struct inode *inode, struct file *filp)
 {
     pr_debug("kxo: %s\n", __func__);
-    if (attr_obj.end == '1') {
-        del_timer_sync(&timer);
-        history_show();
-        mod_timer(&timer, jiffies + msecs_to_jiffies(delay));
-    }
     if (atomic_dec_and_test(&open_cnt)) {
         del_timer_sync(&timer);
         flush_workqueue(kxo_workqueue);
@@ -432,6 +480,7 @@ static const struct file_operations kxo_fops = {
     .llseek = no_llseek,
     .open = kxo_open,
     .release = kxo_release,
+    .unlocked_ioctl = kxo_ioctl,
     .owner = THIS_MODULE,
 };
 
