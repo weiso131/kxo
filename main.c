@@ -7,6 +7,7 @@
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/sysfs.h>
+#include <linux/types.h>
 #include <linux/version.h>
 #include <linux/workqueue.h>
 
@@ -78,7 +79,7 @@ static int major;
 static struct class *kxo_class;
 static struct cdev kxo_cdev;
 
-static char fast_buffer[N_GRIDS];
+static unsigned int fast_buffer;
 
 /* Data are stored into a kfifo buffer before passing them to the userspace */
 static DECLARE_KFIFO_PTR(rx_fifo, unsigned char);
@@ -95,7 +96,8 @@ static DECLARE_WAIT_QUEUE_HEAD(rx_wait);
 /* Insert the whole chess board into the kfifo buffer */
 static void produce_board(void)
 {
-    unsigned int len = kfifo_in(&rx_fifo, fast_buffer, sizeof(fast_buffer));
+    unsigned int len = kfifo_in(
+        &rx_fifo, (const unsigned char *) (&fast_buffer), sizeof(fast_buffer));
     if (unlikely(len < sizeof(fast_buffer)) && printk_ratelimit())
         pr_warn("%s: %zu bytes dropped\n", __func__, sizeof(fast_buffer) - len);
 
@@ -120,7 +122,13 @@ static char table[N_GRIDS];
 /* Draw the board into draw_buffer */
 static int copy_to_buffer(char *table)
 {
-    strncpy(fast_buffer, table, N_GRIDS);
+    fast_buffer = 0;
+    for (int i = 0; i < N_GRIDS; i++) {
+        if (table[i] == 'O')
+            fast_buffer |= (uint32_t) 1 << (i + 16);
+        else if (table[i] == 'X')
+            fast_buffer |= (uint32_t) 1 << i;
+    }
     return 0;
 }
 

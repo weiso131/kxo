@@ -95,7 +95,17 @@ static void listen_keyboard_handler(void)
     close(attr_fd);
 }
 
-static int draw_board(char *table, char *draw_buffer)
+char get_piece(uint32_t table, int k)
+{
+    if ((table >> k) & 1)
+        return 'X';
+    else if ((table >> (k + 16)) & 1)
+        return 'O';
+    else
+        return ' ';
+}
+
+static int draw_board(uint32_t table, char *draw_buffer)
 {
     int i = 0, k = 0;
     draw_buffer[i++] = '\n';
@@ -103,7 +113,7 @@ static int draw_board(char *table, char *draw_buffer)
 
     while (i < DRAWBUFFER_SIZE) {
         for (int j = 0; j < (BOARD_SIZE << 1) - 1 && k < N_GRIDS; j++) {
-            draw_buffer[i++] = j & 1 ? '|' : table[k++];
+            draw_buffer[i++] = j & 1 ? '|' : get_piece(table, k++);
         }
         draw_buffer[i++] = '\n';
         for (int j = 0; j < (BOARD_SIZE << 1) - 1; j++) {
@@ -150,7 +160,7 @@ int main(int argc, char *argv[])
     fcntl(STDIN_FILENO, F_SETFL, flags | O_NONBLOCK);
 
     char display_buf[DRAWBUFFER_SIZE];
-    char table[N_GRIDS];
+    uint32_t table;
     fd_set readset;
     int device_fd = open(XO_DEVICE_FILE, O_RDONLY);
     int max_fd = device_fd > STDIN_FILENO ? device_fd : STDIN_FILENO;
@@ -174,7 +184,7 @@ int main(int argc, char *argv[])
         } else if (read_attr && FD_ISSET(device_fd, &readset)) {
             FD_CLR(device_fd, &readset);
             printf("\033[H\033[J"); /* ASCII escape code to clear the screen */
-            read(device_fd, table, N_GRIDS);
+            read(device_fd, &table, sizeof(uint32_t));
             draw_board(table, display_buf);
             printf("%s", display_buf);
         }
