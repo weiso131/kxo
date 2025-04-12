@@ -13,6 +13,7 @@
 
 #include "game.h"
 #include "history.h"
+#include "kxo_table.h"
 #include "mcts.h"
 #include "negamax.h"
 
@@ -117,18 +118,11 @@ static DEFINE_MUTEX(consumer_lock);
  */
 static struct circ_buf fast_buf;
 
-static char table[N_GRIDS];
-
+static struct table table;
 /* Draw the board into draw_buffer */
-static int copy_to_buffer(char *table)
+static int copy_to_buffer(struct table *table)
 {
-    fast_buffer = 0;
-    for (int i = 0; i < N_GRIDS; i++) {
-        if (table[i] == 'O')
-            fast_buffer |= (uint32_t) 1 << (i + 16);
-        else if (table[i] == 'X')
-            fast_buffer |= (uint32_t) 1 << i;
-    }
+    fast_buffer = GET_TABLE((*table));
     return 0;
 }
 
@@ -164,7 +158,7 @@ static void drawboard_work_func(struct work_struct *w)
     read_unlock(&attr_obj.lock);
 
     mutex_lock(&producer_lock);
-    copy_to_buffer(table);
+    copy_to_buffer(&table);
     mutex_unlock(&producer_lock);
 
     /* Store data to the kfifo buffer */
@@ -177,6 +171,22 @@ static void drawboard_work_func(struct work_struct *w)
 
 static char turn;
 static int finish;
+
+static char get_piece(uint32_t table, int k)
+{
+    if ((table >> k) & 1)
+        return 'X';
+    else if ((table >> (k + 16)) & 1)
+        return 'O';
+    else
+        return ' ';
+}
+
+static void get_char_table(char *char_table, uint32_t table)
+{
+    for (int i = 0; i < 16; i++)
+        char_table[i] = get_piece(table, i);
+}
 
 static void ai_one_work_func(struct work_struct *w)
 {
@@ -193,12 +203,15 @@ static void ai_one_work_func(struct work_struct *w)
     tv_start = ktime_get();
     mutex_lock(&producer_lock);
     int move;
-    WRITE_ONCE(move, mcts(table, 'O'));
+
+    char char_table[16];
+    get_char_table(char_table, GET_TABLE(table));
+
+    WRITE_ONCE(move, mcts(char_table, 'O'));  // repair
     history_update(move);
     smp_mb();
-
     if (move != -1)
-        WRITE_ONCE(table[move], 'O');
+        PLAYER_MOVE(table.player1, move);
 
     WRITE_ONCE(turn, 'X');
     WRITE_ONCE(finish, 1);
@@ -227,12 +240,16 @@ static void ai_two_work_func(struct work_struct *w)
     tv_start = ktime_get();
     mutex_lock(&producer_lock);
     int move;
-    WRITE_ONCE(move, negamax_predict(table, 'X').move);
+
+    char char_table[16];
+    get_char_table(char_table, GET_TABLE(table));
+
+    WRITE_ONCE(move, negamax_predict(char_table, 'X').move);  // repair
     history_update(move);
     smp_mb();
 
     if (move != -1)
-        WRITE_ONCE(table[move], 'X');
+        PLAYER_MOVE(table.player2, move);
 
     WRITE_ONCE(turn, 'O');
     WRITE_ONCE(finish, 1);
@@ -322,7 +339,7 @@ static void timer_handler(struct timer_list *__timer)
 
     tv_start = ktime_get();
 
-    char win = check_win(table);
+    char win = is_win(&table);
 
     if (win == ' ') {
         ai_game();
@@ -336,7 +353,7 @@ static void timer_handler(struct timer_list *__timer)
             put_cpu();
 
             mutex_lock(&producer_lock);
-            copy_to_buffer(table);
+            copy_to_buffer(&table);
             mutex_unlock(&producer_lock);
 
             /* Store data to the kfifo buffer */
@@ -348,8 +365,9 @@ static void timer_handler(struct timer_list *__timer)
         }
 
         if (attr_obj.end == '0') {
-            memset(table, ' ',
-                   N_GRIDS); /* Reset the table so the game restart */
+            table.player1 = 0x5555555555550000ULL;
+            table.player2 =
+                0x5555555555550000ULL; /* Reset the table so the game restart */
             mod_timer(&timer, jiffies + msecs_to_jiffies(delay));
         }
 
@@ -558,7 +576,8 @@ static int __init kxo_init(void)
 
     negamax_init();
     mcts_init();
-    memset(table, ' ', N_GRIDS);
+    table.player1 = 0x5555555555550000ULL;
+    table.player2 = 0x5555555555550000ULL;
     turn = 'O';
     finish = 1;
 
