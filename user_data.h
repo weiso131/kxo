@@ -1,6 +1,7 @@
 #ifndef USER_DATA_H
 #define USER_DATA_H
 
+#include <linux/atomic.h>
 #include <linux/kfifo.h>
 #include <linux/list.h>
 #include <linux/vmalloc.h>
@@ -14,7 +15,7 @@ typedef int (*ai_func_t)(const char *table, char turn);
 typedef struct user_data {
     char table[16];
     char turn;           //'O' or 'X'
-    char unuse;          // tasklet function will release user_data if unuse
+    atomic_t unuse;      // tasklet function will release user_data if unuse
     ai_func_t ai1_func;  //'O', if NULL mean user space control
     ai_func_t ai2_func;  //'X', if NULL mean user space control
 
