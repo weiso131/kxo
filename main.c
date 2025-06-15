@@ -5,6 +5,8 @@
 #include <linux/interrupt.h>
 #include <linux/kfifo.h>
 #include <linux/module.h>
+#include <linux/sched.h>
+#include <linux/sched/signal.h>
 #include <linux/slab.h>
 #include <linux/sysfs.h>
 #include <linux/version.h>
@@ -12,6 +14,7 @@
 #include <linux/workqueue.h>
 
 #include "game.h"
+#include "kxo_namespace.h"
 #include "mcts.h"
 #include "negamax.h"
 #include "user_data.h"
@@ -194,6 +197,9 @@ static ssize_t kxo_read(struct file *file,
                         size_t count,
                         loff_t *ppos)
 {
+    TidData *tid_data = find_tid_data(current->pid);
+    pr_info("kxo: tid %d's tid_data_ptr: %p\n", current->pid, tid_data);
+
     unsigned int read;
     int ret;
 
@@ -230,6 +236,8 @@ static atomic_t open_cnt;
 
 static int kxo_open(struct inode *inode, struct file *filp)
 {
+    int result = add_tid_data(current->pid);
+    pr_info("kxo: tid %d open kxo, result: %d\n", current->pid, result);
     pr_debug("kxo: %s\n", __func__);
     if (atomic_inc_return(&open_cnt) == 1)
         mod_timer(&timer, jiffies + msecs_to_jiffies(delay));
@@ -240,6 +248,8 @@ static int kxo_open(struct inode *inode, struct file *filp)
 
 static int kxo_release(struct inode *inode, struct file *filp)
 {
+    int result = delete_tid_data(current->pid);
+    pr_info("kxo: tid %d close kxo, result: %d\n", current->pid, result);
     pr_debug("kxo: %s\n", __func__);
     if (atomic_dec_and_test(&open_cnt)) {
         del_timer_sync(&timer);
@@ -267,6 +277,7 @@ static int __init kxo_init(void)
     dev_t dev_id;
     int ret;
 
+    init_namespace();
     test_user = init_user_data(&mcts, &negamax_move);
 
     if (!test_user)
