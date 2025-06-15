@@ -55,4 +55,8 @@ void remove_user(pid_t tid, int user_id);
 
 void user_list_queue_work(struct workqueue_struct *wq);
 
+UserData *get_user_data(pid_t tid, int user_id);
+
+// only use when rmmod
+void release_namespace(void);
 #endif

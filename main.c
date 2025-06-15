@@ -124,8 +124,6 @@ static int finish;
 /* Workqueue for asynchronous bottom-half processing */
 static struct workqueue_struct *kxo_workqueue;
 
-UserData *test_user = NULL;
-
 /* Tasklet handler.
  *
  * NOTE: different tasklets can run concurrently on different processors, but
@@ -142,7 +140,7 @@ static void game_tasklet_func(unsigned long __data)
 
     tv_start = ktime_get();
 
-    user_queue_work(test_user, kxo_workqueue);
+    user_list_queue_work(kxo_workqueue);
 
     tv_end = ktime_get();
 
@@ -200,6 +198,13 @@ static ssize_t kxo_read(struct file *file,
     TidData *tid_data = find_tid_data(current->pid);
     pr_info("kxo: tid %d's tid_data_ptr: %p\n", current->pid, tid_data);
 
+    // all thread has just one user, this need to change in future
+    UserData *user_data = get_user_data(current->pid, 0);
+
+    pr_info("kxo user_data: %p\n", user_data);
+    if (!user_data)
+        return -EFAULT;
+
     unsigned int read;
     int ret;
 
@@ -212,7 +217,7 @@ static ssize_t kxo_read(struct file *file,
         return -ERESTARTSYS;
 
     do {
-        ret = kfifo_to_user(&test_user->user_fifo, buf, count, &read);
+        ret = kfifo_to_user(&user_data->user_fifo, buf, count, &read);
         if (unlikely(ret < 0))
             break;
         if (read)
@@ -221,11 +226,9 @@ static ssize_t kxo_read(struct file *file,
             ret = -EAGAIN;
             break;
         }
-        ret = wait_event_interruptible(test_user->rx_wait,
-                                       kfifo_len(&test_user->user_fifo));
+        ret = wait_event_interruptible(user_data->rx_wait,
+                                       kfifo_len(&user_data->user_fifo));
     } while (ret == 0);
-    pr_info("kxo: %s: out %u/%u bytes\n", __func__, read,
-            kfifo_len(&test_user->user_fifo));
     pr_info("kxo: read: %d\n", read);
     mutex_unlock(&read_lock);
 
@@ -238,6 +241,11 @@ static int kxo_open(struct inode *inode, struct file *filp)
 {
     int result = add_tid_data(current->pid);
     pr_info("kxo: tid %d open kxo, result: %d\n", current->pid, result);
+    int user_id =
+        add_user(current->pid, &mcts,
+                 &negamax_move);  // this need to move to ioctl in future
+    pr_info("kxo: user_id: %d == 0\n", user_id);
+
     pr_debug("kxo: %s\n", __func__);
     if (atomic_inc_return(&open_cnt) == 1)
         mod_timer(&timer, jiffies + msecs_to_jiffies(delay));
@@ -278,10 +286,6 @@ static int __init kxo_init(void)
     int ret;
 
     init_namespace();
-    test_user = init_user_data(&mcts, &negamax_move);
-
-    if (!test_user)
-        return -ENOMEM;
 
     negamax_init();
     mcts_init();
@@ -289,7 +293,7 @@ static int __init kxo_init(void)
     /* Register major/minor numbers */
     ret = alloc_chrdev_region(&dev_id, 0, NR_KMLDRV, DEV_NAME);
     if (ret)
-        goto error_alloc;
+        goto out;
     major = MAJOR(dev_id);
 
     /* Add the character device to the system */
@@ -357,8 +361,6 @@ error_cdev:
     cdev_del(&kxo_cdev);
 error_region:
     unregister_chrdev_region(dev_id, NR_KMLDRV);
-error_alloc:
-    release_user_data(&test_user);
     goto out;
 }
 
@@ -376,7 +378,7 @@ static void __exit kxo_exit(void)
     cdev_del(&kxo_cdev);
     unregister_chrdev_region(dev_id, NR_KMLDRV);
 
-    release_user_data(&test_user);
+    release_namespace();
     pr_info("kxo: unloaded\n");
 }
 

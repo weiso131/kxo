@@ -26,6 +26,7 @@ typedef struct user_data {
     /* Wait queue to implement blocking I/O from userspace */
     struct wait_queue_head rx_wait;
 
+    struct hlist_node hlist;
 } UserData;
 
 UserData *init_user_data(ai_func_t ai1_func, ai_func_t ai2_func);
@@ -38,11 +39,6 @@ static void release_user_data(UserData **user_data)
     vfree(*user_data);
     *user_data = NULL;
 };
-
-static void user_queue_work(UserData *user_data, struct workqueue_struct *wq)
-{
-    queue_work(wq, &user_data->work);
-}
 
 static ai_func_t get_turn_function(UserData *user_data)
 {
