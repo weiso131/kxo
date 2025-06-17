@@ -125,9 +125,10 @@ void user_list_queue_work(struct workqueue_struct *wq)
             break;
         struct hlist_node *n = user_data->hlist.next;
 
-        if (!atomic_read(&user_data->unuse))
-            queue_work(wq, &user_data->work);
-        else {
+        if (!atomic_read(&user_data->unuse)) {
+            if (get_turn_function(user_data))
+                queue_work(wq, &user_data->work);
+        } else {
             hlist_del(&user_data->hlist);
             hlist_add_head(&user_data->hlist, &trash_list_head);
         }
