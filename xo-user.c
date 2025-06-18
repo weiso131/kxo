@@ -76,10 +76,45 @@ static void listen_keyboard_handler(void)
             end_attr = true;
             write(attr_fd, buf, 6);
             printf("\n\nStopping the kernel space tic-tac-toe game...\n");
+            history_release();
             break;
         }
     }
     close(attr_fd);
+}
+
+__uint32_t board = 0;
+
+static char *display_board(const char table)
+{
+    history_update(table);
+
+    board = (board | ((1 << (table & 15)) << 16));
+    if ((table >> 4) & 1)
+        board |= (1 << (table & 0xF));
+    int k = 0;
+
+    for (int i = 0; i < 4; i++) {
+        for (int j = 0; j < (BOARD_SIZE << 1) - 1 && k < N_GRIDS; j++) {
+            putchar((j & 1)
+                        ? '|'
+                        : (((board >> 16) & (1 << ((j >> 1) + (i << 2))))
+                               ? (((board & (1 << ((j >> 1) + (i << 2)))) != 0)
+                                      ? 'X'
+                                      : 'O')
+                               : ' '));
+        }
+        putchar('\n');
+        for (int j = 0; j < (BOARD_SIZE << 1) - 1; j++)
+            putchar('-');
+        putchar('\n');
+    }
+    if (table >> 5) {
+        board = 0;
+        history_new_table();
+    }
+
+    return 0;
 }
 
 int main(int argc, char *argv[])
@@ -118,7 +153,7 @@ int main(int argc, char *argv[])
             printf("\033[H\033[J"); /* ASCII escape code to clear the screen */
             read(device_fd, display_buf, DRAWBUFFER_SIZE);
             display_buf[DRAWBUFFER_SIZE - 1] = '\0';
-            printf("%s", display_buf);
+            display_board(display_buf[0]);
         }
     }
 
