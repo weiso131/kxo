@@ -9,6 +9,7 @@
 #include <unistd.h>
 
 #include "game.h"
+#include "history.h"
 
 #define XO_STATUS_FILE "/sys/module/kxo/initstate"
 #define XO_DEVICE_FILE "/dev/kxo"
@@ -133,6 +134,8 @@ int main(int argc, char *argv[])
     int max_fd = device_fd > STDIN_FILENO ? device_fd : STDIN_FILENO;
     read_attr = true;
     end_attr = false;
+
+    history_init();
 
     while (!end_attr) {
         FD_ZERO(&readset);
