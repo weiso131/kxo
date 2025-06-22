@@ -36,17 +36,6 @@ MODULE_DESCRIPTION("In-kernel Tic-Tac-Toe game engine");
 
 static int delay = 100; /* time (in ms) to generate an event */
 
-/* Declare kernel module attribute for sysfs */
-
-struct kxo_attr {
-    char display;
-    char resume;
-    char end;
-    rwlock_t lock;
-};
-
-static struct kxo_attr attr_obj;
-
 static int negamax_move(const char *table, char player)
 {
     char table_copy[16];
@@ -54,31 +43,6 @@ static int negamax_move(const char *table, char player)
     return negamax_predict(table_copy, player).move;
 }
 
-
-static ssize_t kxo_state_show(struct device *dev,
-                              struct device_attribute *attr,
-                              char *buf)
-{
-    read_lock(&attr_obj.lock);
-    int ret = snprintf(buf, 7, "%c %c %c\n", attr_obj.display, attr_obj.resume,
-                       attr_obj.end);
-    read_unlock(&attr_obj.lock);
-    return ret;
-}
-
-static ssize_t kxo_state_store(struct device *dev,
-                               struct device_attribute *attr,
-                               const char *buf,
-                               size_t count)
-{
-    write_lock(&attr_obj.lock);
-    sscanf(buf, "%c %c %c", &(attr_obj.display), &(attr_obj.resume),
-           &(attr_obj.end));
-    write_unlock(&attr_obj.lock);
-    return count;
-}
-
-static DEVICE_ATTR_RW(kxo_state);
 
 /* Data produced by the simulated device */
 
@@ -265,7 +229,6 @@ static int kxo_release(struct inode *inode, struct file *filp)
         fast_buf_clear();
     }
     pr_info("release, current cnt: %d\n", atomic_read(&open_cnt));
-    attr_obj.end = 48;
 
     return 0;
 }
@@ -317,14 +280,7 @@ static int __init kxo_init(void)
     }
 
     /* Register the device with sysfs */
-    struct device *kxo_dev =
-        device_create(kxo_class, NULL, MKDEV(major, 0), NULL, DEV_NAME);
-
-    ret = device_create_file(kxo_dev, &dev_attr_kxo_state);
-    if (ret < 0) {
-        printk(KERN_ERR "failed to create sysfs file kxo_state\n");
-        goto error_device;
-    }
+    device_create(kxo_class, NULL, MKDEV(major, 0), NULL, DEV_NAME);
 
     /* Allocate fast circular buffer */
     fast_buf.buf = vmalloc(PAGE_SIZE);
@@ -340,10 +296,6 @@ static int __init kxo_init(void)
         goto error_workqueue;
     }
 
-    attr_obj.display = '1';
-    attr_obj.resume = '1';
-    attr_obj.end = '0';
-    rwlock_init(&attr_obj.lock);
     /* Setup the timer */
     timer_setup(&timer, timer_handler, 0);
     atomic_set(&open_cnt, 0);
@@ -355,7 +307,6 @@ error_workqueue:
     vfree(fast_buf.buf);
 error_vmalloc:
     device_destroy(kxo_class, dev_id);
-error_device:
     class_destroy(kxo_class);
 error_cdev:
     cdev_del(&kxo_cdev);
