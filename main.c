@@ -243,6 +243,13 @@ static const struct file_operations kxo_fops = {
     .release = kxo_release,
 };
 
+static char *kxo_devnode(const struct device *dev, umode_t *mode)
+{
+    if (mode)
+        *mode = 0666;
+    return NULL;
+}
+
 static int __init kxo_init(void)
 {
     dev_t dev_id;
@@ -273,6 +280,7 @@ static int __init kxo_init(void)
 #else
     kxo_class = class_create(DEV_NAME);
 #endif
+    kxo_class->devnode = kxo_devnode;
     if (IS_ERR(kxo_class)) {
         printk(KERN_ERR "error creating kxo class\n");
         ret = PTR_ERR(kxo_class);
