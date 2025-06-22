@@ -13,7 +13,6 @@
 
 #define XO_STATUS_FILE "/sys/module/kxo/initstate"
 #define XO_DEVICE_FILE "/dev/kxo"
-#define XO_DEVICE_ATTR_FILE "/sys/class/kxo/kxo/kxo_state"
 
 static bool status_check(void)
 {
@@ -56,32 +55,23 @@ static bool read_attr, end_attr;
 
 static void listen_keyboard_handler(void)
 {
-    int attr_fd = open(XO_DEVICE_ATTR_FILE, O_RDWR);
     char input;
-
     if (read(STDIN_FILENO, &input, 1) == 1) {
-        char buf[20];
         switch (input) {
         case 16: /* Ctrl-P */
-            read(attr_fd, buf, 6);
-            buf[0] = (buf[0] - '0') ? '0' : '1';
+
             read_attr ^= 1;
-            write(attr_fd, buf, 6);
             if (!read_attr)
                 printf("\n\nStopping to display the chess board...\n");
             break;
         case 17: /* Ctrl-Q */
-            read(attr_fd, buf, 6);
-            buf[4] = '1';
             read_attr = false;
             end_attr = true;
-            write(attr_fd, buf, 6);
             printf("\n\nStopping the kernel space tic-tac-toe game...\n");
             history_release();
             break;
         }
     }
-    close(attr_fd);
 }
 
 __uint32_t board = 0;
@@ -93,23 +83,27 @@ static char *display_board(const char table)
     board = (board | ((1 << (table & 15)) << 16));
     if ((table >> 4) & 1)
         board |= (1 << (table & 0xF));
-    int k = 0;
 
-    for (int i = 0; i < 4; i++) {
-        for (int j = 0; j < (BOARD_SIZE << 1) - 1 && k < N_GRIDS; j++) {
-            putchar((j & 1)
+    if (read_attr) {
+        int k = 0;
+        for (int i = 0; i < 4; i++) {
+            for (int j = 0; j < (BOARD_SIZE << 1) - 1 && k < N_GRIDS; j++) {
+                putchar(
+                    (j & 1)
                         ? '|'
                         : (((board >> 16) & (1 << ((j >> 1) + (i << 2))))
                                ? (((board & (1 << ((j >> 1) + (i << 2)))) != 0)
                                       ? 'X'
                                       : 'O')
                                : ' '));
+            }
+            putchar('\n');
+            for (int j = 0; j < (BOARD_SIZE << 1) - 1; j++)
+                putchar('-');
+            putchar('\n');
         }
-        putchar('\n');
-        for (int j = 0; j < (BOARD_SIZE << 1) - 1; j++)
-            putchar('-');
-        putchar('\n');
     }
+
     if (table >> 5) {
         board = 0;
         history_new_table();
@@ -151,7 +145,7 @@ int main(int argc, char *argv[])
         if (FD_ISSET(STDIN_FILENO, &readset)) {
             FD_CLR(STDIN_FILENO, &readset);
             listen_keyboard_handler();
-        } else if (read_attr && FD_ISSET(device_fd, &readset)) {
+        } else if (FD_ISSET(device_fd, &readset)) {
             FD_CLR(device_fd, &readset);
             printf("\033[H\033[J"); /* ASCII escape code to clear the screen */
             read(device_fd, &display_buf, 1);
