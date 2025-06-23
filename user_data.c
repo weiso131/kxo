@@ -34,6 +34,11 @@ static void ai_work_func(struct work_struct *w)
     ai_func_t ai_func = get_turn_function(user_data);
     smp_mb();
 
+    if (ai_func == NULL)
+        goto null_func;
+
+    smp_mb();
+
     int move;
     WRITE_ONCE(move, ai_func(user_data->table, user_data->turn));
     smp_mb();
@@ -57,6 +62,7 @@ static void ai_work_func(struct work_struct *w)
     if (win != ' ')
         reset_user_data_table(user_data);
 
+null_func:
     put_cpu();
     tv_end = ktime_get();
     nsecs = (s64) ktime_to_ns(ktime_sub(tv_end, tv_start));

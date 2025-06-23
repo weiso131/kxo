@@ -219,6 +219,48 @@ static ssize_t kxo_read(struct file *file,
     return ret ? ret : read;
 }
 
+static ssize_t kxo_write(struct file *file,
+                         const char __user *buff,
+                         size_t len,
+                         loff_t *off)
+{
+    TidData *tid_data = find_tid_data(current->pid);
+    pr_info("kxo: tid %d's tid_data_ptr: %p\n", current->pid, tid_data);
+
+    short int data;
+    if (copy_from_user(&data, buff, 2))
+        return -EFAULT;
+    char user_id = data & 0xff;
+    char move = (data >> 8) & 0xf;
+
+    UserData *user_data = get_user_data(current->pid, user_id);
+
+    if (!user_data)
+        return -EFAULT;
+    if (get_turn_function(user_data) != NULL)
+        return -EPERM;
+    if (user_data->table[move] != ' ')
+        return -EPERM;
+    WRITE_ONCE(user_data->table[move], user_data->turn);
+
+    WRITE_ONCE(move, (user_data->turn == 'X') << 4 | move);
+
+    char win;
+    WRITE_ONCE(win, check_win(user_data->table));
+
+    if (win != ' ') {
+        move |= 1 << 5;
+        reset_user_data_table(user_data);
+    } else
+        WRITE_ONCE(user_data->turn, user_data->turn ^ 'O' ^ 'X');
+
+    if (copy_to_user(buff, &move, sizeof(move)))
+        return -EFAULT;
+
+
+    return 0;
+}
+
 static atomic_t open_cnt;
 
 static int kxo_open(struct inode *inode, struct file *filp)
@@ -254,6 +296,7 @@ static const struct file_operations kxo_fops = {
     .owner = THIS_MODULE,
 #endif
     .read = kxo_read,
+    .write = kxo_write,
     .llseek = no_llseek,
     .open = kxo_open,
     .release = kxo_release,

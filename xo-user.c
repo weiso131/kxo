@@ -114,6 +114,23 @@ static char *display_board(const char table)
     return 0;
 }
 
+unsigned char random_get_move()
+{
+    __uint16_t available = board >> 16;
+    int available_cnt = 0;
+    int available_move[16];
+    for (int i = 0; i < 16; i++) {
+        if (!((available >> i) & 1)) {
+            available_move[available_cnt] = i;
+            available_cnt++;
+        }
+    }
+
+    unsigned char move = available_move[rand() % available_cnt];
+
+    return move;
+}
+
 int main(int argc, char *argv[])
 {
     if (!status_check())
@@ -126,18 +143,19 @@ int main(int argc, char *argv[])
     char display_buf;
 
     fd_set readset;
-    int device_fd = open(XO_DEVICE_FILE, O_RDONLY);
+    int device_fd = open(XO_DEVICE_FILE, O_RDWR);
     int max_fd = device_fd > STDIN_FILENO ? device_fd : STDIN_FILENO;
     read_attr = true;
     end_attr = false;
 
     unsigned char user_id;
 
-    if (get_user_id(user_id, MCTS, NEGAMAX) < 0) {
+    if (get_user_id(user_id, USER_CTL, MCTS) < 0) {
         printf("error\n");
         goto close_kxo;
     }
 
+    char turn = 'O';
     history_init();
 
     while (!end_attr) {
@@ -156,11 +174,33 @@ int main(int argc, char *argv[])
             listen_keyboard_handler();
         } else if (FD_ISSET(device_fd, &readset)) {
             FD_CLR(device_fd, &readset);
+
+            if (turn == 'O') {
+                unsigned char move = random_get_move();
+                __uint16_t data = user_id | (((__uint16_t) move) << 8);
+                int fd_result = write(device_fd, &data, 2);
+                if (fd_result < 0) {
+                    printf("result: %d\n", fd_result);
+                    break;
+                }
+
+                display_buf = data & 0xff;
+
+            } else {
+                display_buf = user_id;
+                int fd_result = read(device_fd, &display_buf, 1);
+                if (fd_result < 0) {
+                    printf("result: %d\n", fd_result);
+                    break;
+                }
+            }
             printf("\033[H\033[J"); /* ASCII escape code to clear the screen */
-            display_buf = user_id;
-            if (read(device_fd, &display_buf, 1) < 0)
-                break;
             display_board(display_buf);
+
+            turn = turn ^ 'O' ^ 'X';
+
+            if (board == 0)
+                turn = 'O';
         }
     }
 
