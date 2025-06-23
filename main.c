@@ -57,22 +57,6 @@ static struct cdev kxo_cdev;
 
 static char draw_buffer[DRAWBUFFER_SIZE];
 
-
-/* NOTE: the usage of kfifo is safe (no need for extra locking), until there is
- * only one concurrent reader and one concurrent writer. Writes are serialized
- * from the interrupt context, readers are serialized using this mutex.
- */
-static DEFINE_MUTEX(read_lock);
-
-
-/* Mutex to serialize kfifo writers within the workqueue handler */
-static DEFINE_MUTEX(producer_lock);
-
-/* Mutex to serialize fast_buf consumers: we can use a mutex because consumers
- * run in workqueue handler (kernel thread context).
- */
-static DEFINE_MUTEX(consumer_lock);
-
 /* We use an additional "faster" circular buffer to quickly store data from
  * interrupt context, before adding them to the kfifo.
  */
@@ -218,9 +202,6 @@ static ssize_t kxo_read(struct file *file,
     if (unlikely(!access_ok(buf, count)))
         return -EFAULT;
 
-    if (mutex_lock_interruptible(&read_lock))
-        return -ERESTARTSYS;
-
     do {
         ret = kfifo_to_user(&user_data->user_fifo, buf, count, &read);
         if (unlikely(ret < 0))
@@ -234,8 +215,6 @@ static ssize_t kxo_read(struct file *file,
         ret = wait_event_interruptible(user_data->rx_wait,
                                        kfifo_len(&user_data->user_fifo));
     } while (ret == 0);
-    pr_info("kxo: read: %d\n", read);
-    mutex_unlock(&read_lock);
 
     return ret ? ret : read;
 }
