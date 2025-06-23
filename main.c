@@ -14,6 +14,7 @@
 #include <linux/workqueue.h>
 
 #include "game.h"
+#include "kxo_ioctl.h"
 #include "kxo_namespace.h"
 #include "mcts.h"
 #include "negamax.h"
@@ -154,6 +155,43 @@ static void timer_handler(struct timer_list *__timer)
     local_irq_enable();
 }
 
+ai_func_t alg_list[] = {NULL, &mcts, &negamax_move};
+
+static long kxo_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
+{
+    int ret = 0;
+    switch (cmd) {
+    case GET_USER_ID:
+        char data;
+        if (copy_from_user(&data, (char __user *) arg, sizeof(data))) {
+            ret = EFAULT;
+            goto error;
+        }
+        char p1 = data >> 4;
+        char p2 = data & 0x0f;
+
+        int user_id = add_user(current->pid, alg_list[p1], alg_list[p2]);
+        if (user_id == -1) {
+            ret = -ENOMEM;
+            goto error;
+        }
+
+        data = (unsigned char) user_id;
+
+        if (copy_to_user((unsigned char __user *) arg, &data, sizeof(data))) {
+            ret = -EFAULT;
+            goto error;
+        }
+
+        break;
+    default:
+        break;
+    }
+
+error:
+    return ret;
+}
+
 static ssize_t kxo_read(struct file *file,
                         char __user *buf,
                         size_t count,
@@ -162,12 +200,15 @@ static ssize_t kxo_read(struct file *file,
     TidData *tid_data = find_tid_data(current->pid);
     pr_info("kxo: tid %d's tid_data_ptr: %p\n", current->pid, tid_data);
 
-    // all thread has just one user, this need to change in future
-    UserData *user_data = get_user_data(current->pid, 0);
+    unsigned char user_id;
+    if (copy_from_user(&user_id, (char __user *) buf, sizeof(user_id)))
+        return -EFAULT;
+    UserData *user_data = get_user_data(current->pid, user_id);
 
-    pr_info("kxo user_data: %p\n", user_data);
     if (!user_data)
         return -EFAULT;
+    if (get_turn_function(user_data) == NULL)
+        return -EPERM;
 
     unsigned int read;
     int ret;
@@ -205,10 +246,6 @@ static int kxo_open(struct inode *inode, struct file *filp)
 {
     int result = add_tid_data(current->pid);
     pr_info("kxo: tid %d open kxo, result: %d\n", current->pid, result);
-    int user_id =
-        add_user(current->pid, &mcts,
-                 &negamax_move);  // this need to move to ioctl in future
-    pr_info("kxo: user_id: %d == 0\n", user_id);
 
     pr_debug("kxo: %s\n", __func__);
     if (atomic_inc_return(&open_cnt) == 1)
@@ -241,7 +278,7 @@ static const struct file_operations kxo_fops = {
     .llseek = no_llseek,
     .open = kxo_open,
     .release = kxo_release,
-};
+    .unlocked_ioctl = kxo_ioctl};
 
 static char *kxo_devnode(const struct device *dev, umode_t *mode)
 {

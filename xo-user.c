@@ -4,12 +4,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/ioctl.h>
 #include <sys/select.h>
 #include <termios.h>
 #include <unistd.h>
 
 #include "game.h"
 #include "history.h"
+#include "kxo_ioctl.h"
 
 #define XO_STATUS_FILE "/sys/module/kxo/initstate"
 #define XO_DEVICE_FILE "/dev/kxo"
@@ -129,6 +131,13 @@ int main(int argc, char *argv[])
     read_attr = true;
     end_attr = false;
 
+    unsigned char user_id;
+
+    if (get_user_id(user_id, MCTS, NEGAMAX) < 0) {
+        printf("error\n");
+        goto close_kxo;
+    }
+
     history_init();
 
     while (!end_attr) {
@@ -148,7 +157,9 @@ int main(int argc, char *argv[])
         } else if (FD_ISSET(device_fd, &readset)) {
             FD_CLR(device_fd, &readset);
             printf("\033[H\033[J"); /* ASCII escape code to clear the screen */
-            read(device_fd, &display_buf, 1);
+            display_buf = user_id;
+            if (read(device_fd, &display_buf, 1) < 0)
+                break;
             display_board(display_buf);
         }
     }
@@ -156,6 +167,7 @@ int main(int argc, char *argv[])
     raw_mode_disable();
     fcntl(STDIN_FILENO, F_SETFL, flags);
 
+close_kxo:
     close(device_fd);
 
     return 0;
