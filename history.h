@@ -6,16 +6,12 @@ struct history {
     int count;
     int index;
     struct history *next;
-    struct history *head;
 };
 
-static inline void INIT_HISTORY(struct history *init,
-                                int index,
-                                struct history *head)
+static inline void INIT_HISTORY(struct history *init, int index)
 {
     init->index = index;
     init->count = 0;
-    init->head = head;
     init->next = NULL;
     init->value = 0;
 }
