@@ -1,37 +1,33 @@
 #include "history.h"
 
-struct history *current = NULL, *head = NULL;
-
-void history_init(void)
+void history_init(History *history)
 {
-    struct history *new = malloc(sizeof(struct history));
-    head = new;
-
+    struct history_node *new = malloc(sizeof(struct history_node));
     INIT_HISTORY(new, 0);
-    current = new;
+    history->head = new;
+    history->tail = new;
+    return;
+}
+
+void history_update(History *history, int move)
+{
+    history->tail->value += ((move & 15) << (history->tail->count << 2));
+    history->tail->count++;
 
     return;
 }
 
-void history_update(int move)
+void history_new_table(History *history)
 {
-    current->value += ((move & 15) << (current->count << 2));
-    current->count++;
+    struct history_node *new = malloc(sizeof(struct history_node));
 
-    return;
-}
-
-void history_new_table(void)
-{
-    struct history *new = malloc(sizeof(struct history));
-
-    if (current->index >= HISTORY_MAX) {
-        head = head->next;
+    if (history->tail->index >= HISTORY_MAX) {
+        history->head = history->head->next;
     }
 
-    INIT_HISTORY(new, ++(current->index));
-    current->next = new;
-    current = current->next;
+    INIT_HISTORY(new, ++(history->tail->index));
+    history->tail->next = new;
+    history->tail = history->tail->next;
 
     return;
 }
@@ -47,13 +43,13 @@ void print_history(__int64_t history, int count)
     }
 }
 
-void history_release(void)
+void history_release(History *history)
 {
-    current = head;
+    struct history_node *current = history->head;
     while (current) {
         print_history(current->value, current->count);
         printf("\n");
-        struct history *temp = current;
+        struct history_node *temp = current;
         current = current->next;
         free(temp);
     }

@@ -54,7 +54,7 @@ static void raw_mode_enable(void)
 }
 
 static bool read_attr, end_attr;
-
+History history;
 static void listen_keyboard_handler(void)
 {
     char input;
@@ -70,7 +70,7 @@ static void listen_keyboard_handler(void)
             read_attr = false;
             end_attr = true;
             printf("\n\nStopping the kernel space tic-tac-toe game...\n");
-            history_release();
+            history_release(&history);
             break;
         }
     }
@@ -80,7 +80,7 @@ __uint32_t board = 0;
 
 static char *display_board(const char table)
 {
-    history_update(table);
+    history_update(&history, table);
 
     board = (board | ((1 << (table & 15)) << 16));
     if ((table >> 4) & 1)
@@ -108,7 +108,7 @@ static char *display_board(const char table)
 
     if (table >> 5) {
         board = 0;
-        history_new_table();
+        history_new_table(&history);
     }
 
     return 0;
@@ -156,7 +156,7 @@ int main(int argc, char *argv[])
     }
 
     char turn = 'O';
-    history_init();
+    history_init(&history);
 
     while (!end_attr) {
         FD_ZERO(&readset);
