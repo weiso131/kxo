@@ -1,3 +1,5 @@
+#ifndef HISTORY_H
+#define HISTORY_H
 #define HISTORY_MAX 128
 #include <stdio.h>
 #include <stdlib.h>
@@ -29,3 +31,4 @@ void history_update(History *history, int move);
 void history_new_table(History *history);
 
 void history_release(History *history);
+#endif
