@@ -1,12 +1,13 @@
 #include "history.h"
 
-struct history *current = NULL;
+struct history *current = NULL, *head = NULL;
 
 void history_init(void)
 {
     struct history *new = malloc(sizeof(struct history));
+    head = new;
 
-    INIT_HISTORY(new, 0, new);
+    INIT_HISTORY(new, 0);
     current = new;
 
     return;
@@ -25,12 +26,10 @@ void history_new_table(void)
     struct history *new = malloc(sizeof(struct history));
 
     if (current->index >= HISTORY_MAX) {
-        struct history *temp = current->head;
-        current->head = current->head->next;
-        free(temp);
+        head = head->next;
     }
 
-    INIT_HISTORY(new, ++current->index, current->head);
+    INIT_HISTORY(new, ++(current->index));
     current->next = new;
     current = current->next;
 
@@ -40,14 +39,17 @@ void history_new_table(void)
 void print_history(__int64_t history, int count)
 {
     for (int i = 0; i < count; i++) {
-        printf("%lx%ld->", ((history >> 2) & 3) + 10, (history & 3) + 1);
+        printf("%lx%ld", ((history >> 2) & 3) + 10, (history & 3) + 1);
         history = (history >> 4);
+        if (i == count - 1)
+            break;
+        printf("->");
     }
 }
 
 void history_release(void)
 {
-    current = current->head;
+    current = head;
     while (current) {
         print_history(current->value, current->count);
         printf("\n");
