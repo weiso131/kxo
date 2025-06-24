@@ -116,6 +116,16 @@ static char *display_board(const char table)
 
 int main(int argc, char *argv[])
 {
+    if (argc != 3) {
+    wrong_input:
+        printf("Please input two value for player1 and player2\n");
+        printf("Player type:\n");
+        printf("USER_CTL: 0\nMCTS: 1\nNEGAMAX: 2\n");
+        return 0;
+    }
+    int player1 = argv[1][0] - '0', player2 = argv[2][0] - '0';
+    if (player1 > 2 || player2 > 2)
+        goto wrong_input;
     if (!status_check())
         exit(1);
 
@@ -129,7 +139,7 @@ int main(int argc, char *argv[])
     read_attr = true;
     end_attr = false;
 
-    userspace_data = init_userspace(device_fd, USER_CTL, MCTS);
+    userspace_data = init_userspace(device_fd, player1, player2);
 
     while (!end_attr) {
         FD_ZERO(&readset);
@@ -162,7 +172,6 @@ int main(int argc, char *argv[])
     raw_mode_disable();
     fcntl(STDIN_FILENO, F_SETFL, flags);
 
-close_kxo:
     close(device_fd);
 
     return 0;
