@@ -107,6 +107,8 @@ int add_user(pid_t tid, ai_func_t ai1_func, ai_func_t ai2_func)
 UserData *get_user_data(pid_t tid, int user_id)
 {
     TidData *tid_data = find_tid_data(tid);
+    if (user_id > USER_MAX)
+        return NULL;
     UserData *user_data = tid_data->user_data_list[user_id];
 
     return user_data;

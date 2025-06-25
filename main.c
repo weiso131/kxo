@@ -151,8 +151,8 @@ static long kxo_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
             ret = EFAULT;
             goto error;
         }
-        char p1 = data >> 4;
-        char p2 = data & 0x0f;
+        unsigned char p1 = data >> 4;
+        unsigned char p2 = data & 0x0f;
 
         int user_id = add_user(current->pid, alg_list[p1], alg_list[p2]);
         if (user_id == -1) {
@@ -230,8 +230,8 @@ static ssize_t kxo_write(struct file *file,
     short int data;
     if (copy_from_user(&data, buff, 2))
         return -EFAULT;
-    char user_id = data & 0xff;
-    char move = (data >> 8) & 0xf;
+    unsigned char user_id = data & 0xff;
+    unsigned char move = (data >> 8) & 0xf;
 
     UserData *user_data = get_user_data(current->pid, user_id);
 
@@ -239,7 +239,7 @@ static ssize_t kxo_write(struct file *file,
         return -EFAULT;
     if (get_turn_function(user_data) != NULL)
         return -EPERM;
-    if (user_data->table[move] != ' ')
+    if (move >= 16 || user_data->table[move] != ' ')
         return -EPERM;
     WRITE_ONCE(user_data->table[move], user_data->turn);
 
