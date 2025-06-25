@@ -7,3 +7,5 @@
 *.cmd
 *.symvers
 xo-user
+xo-train
+state_value.bin

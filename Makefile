@@ -7,7 +7,7 @@ KDIR ?= /lib/modules/$(shell uname -r)/build
 PWD := $(shell pwd)
 
 GIT_HOOKS := .git/hooks/applied
-all: kmod xo-user
+all: kmod xo-user xo-train
 
 kmod: $(GIT_HOOKS) main.c
 	$(MAKE) -C $(KDIR) M=$(PWD) modules
@@ -15,6 +15,8 @@ kmod: $(GIT_HOOKS) main.c
 xo-user: xo-user.c history.c
 	$(CC) $(ccflags-y) -o $@ $^
 
+xo-train: xo-train.c history.c rl/train.c rl/reinforcement_learning.c
+	$(CC) $(ccflags-y) -o $@ $^
 $(GIT_HOOKS):
 	@scripts/install-git-hooks
 	@echo
