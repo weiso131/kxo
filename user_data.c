@@ -5,7 +5,7 @@ static void produce_board(UserData *user_data, int move, char is_win)
     char buffer;
     WRITE_ONCE(buffer, (char) move +
                            (((user_data->turn ^ 'O' ^ 'X') == 'X') << 4) +
-                           (is_win << 5));
+                           ((is_win != ' ') << 5) + ((is_win == 'D') << 6));
     smp_mb();
     unsigned int len = kfifo_in(
         &user_data->user_fifo, (const unsigned char *) &buffer, sizeof(buffer));
@@ -53,7 +53,7 @@ static void ai_work_func(struct work_struct *w)
     WRITE_ONCE(win, check_win(user_data->table));
     smp_mb();
 
-    produce_board(user_data, move, win != ' ');
+    produce_board(user_data, move, win);
 
     smp_mb();
 

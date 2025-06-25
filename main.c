@@ -250,6 +250,7 @@ static ssize_t kxo_write(struct file *file,
 
     if (win != ' ') {
         move |= 1 << 5;
+        move |= (win == 'D') << 6;
         reset_user_data_table(user_data);
     } else
         WRITE_ONCE(user_data->turn, user_data->turn ^ 'O' ^ 'X');
