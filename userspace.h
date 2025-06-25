@@ -41,11 +41,11 @@ malloc_fail:
     return NULL;
 }
 
-static inline void update_board(Userspace *us_data, const char move)
+static inline void update_board(uint32_t *board, const char move)
 {
-    us_data->board = (us_data->board | ((1 << (move & 15)) << 16));
+    *board = (*board | ((1 << (move & 15)) << 16));
     if ((move >> 4) & 1)
-        us_data->board |= (1 << (move & 0xF));
+        *board |= (1 << (move & 0xF));
 }
 
 static inline PlayerPermission get_permission(Userspace *us_data)

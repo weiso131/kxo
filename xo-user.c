@@ -84,7 +84,7 @@ static char *display_board(const char table)
 {
     history_update(&userspace_data->history, table);
 
-    update_board(userspace_data, table);
+    update_board(&userspace_data->board, table);
 
     if (read_attr) {
         int k = 0;
