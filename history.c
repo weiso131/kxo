@@ -11,7 +11,8 @@ void history_init(History *history)
 
 void history_update(History *history, int move)
 {
-    history->tail->value += ((move & 15) << (history->tail->count << 2));
+    history->tail->value +=
+        ((__uint64_t) (move & 15) << (history->tail->count << 2));
     history->tail->count++;
 
     return;
