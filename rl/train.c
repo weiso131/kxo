@@ -72,7 +72,7 @@ void release_training()
 #if EPSILON_GREEDY
 
 static int get_action_epsilon_greedy(const Userspace *us_data,
-                                     rl_agent_t *agent)
+                                     const rl_agent_t *agent)
 {
     if (RAND_UNIFORM < epsilon) {  // explore
         int act = random_get_move(us_data);

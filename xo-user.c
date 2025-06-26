@@ -12,6 +12,7 @@
 #include "game.h"
 #include "history.h"
 #include "kxo_ioctl.h"
+#include "rl/reinforcement_learning.h"
 #include "userspace.h"
 
 #define XO_STATUS_FILE "/sys/module/kxo/initstate"
@@ -114,18 +115,48 @@ static char *display_board(const char table)
     return 0;
 }
 
-int main(int argc, char *argv[])
+int arg_to_int(char arg)
 {
-    if (argc != 3) {
+    switch (arg) {
+    case 'r':
+        return 0;
+    case 'm':
+        return 1;
+    case 'n':
+        return 2;
+    case 't':
+        return 16;
+    default:
+        return -1;
+    }
+}
+
+int main(int argc, const char *argv[])
+{
+    rl_agent_t agent1, agent2;
+    if (argc < 3) {
     wrong_input:
         printf("Please input two value for player1 and player2\n");
         printf("Player type:\n");
-        printf("USER_CTL: 0\nMCTS: 1\nNEGAMAX: 2\n");
+        printf("RANDOM: r\nMCTS: m\nNEGAMAX: n\nTD_LEARNING: t\n");
         return 0;
     }
-    int player1 = argv[1][0] - '0', player2 = argv[2][0] - '0';
-    if (player1 > 2 || player2 > 2)
+    int player1 = arg_to_int(argv[1][0]), player2 = arg_to_int(argv[2][0]);
+
+    if (player1 == -1 || player2 == -1)
         goto wrong_input;
+    if (player1 == 16) {
+        unsigned int state_num = 1;
+        CALC_STATE_NUM(state_num);
+        init_rl_agent(&agent1, state_num, 'O');
+        load_model(&agent1, state_num, MODEL_NAME);
+    }
+    if (player2 == 16) {
+        unsigned int state_num = 1;
+        CALC_STATE_NUM(state_num);
+        init_rl_agent(&agent2, state_num, 'X');
+        load_model(&agent2, state_num, MODEL_NAME);
+    }
     if (!status_check())
         exit(1);
 
@@ -159,8 +190,19 @@ int main(int argc, char *argv[])
             FD_CLR(device_fd, &readset);
             char display_buf;
             if (get_permission(userspace_data) == USER_CTL) {
-                unsigned char move = random_get_move(userspace_data);
+                uint8_t move = random_get_move(userspace_data);
                 user_control(userspace_data, move, &display_buf);
+            } else if (get_permission(userspace_data) == 16) {
+                int move = -1;
+                if (userspace_data->turn == 'O')
+                    move = get_action_exploit(userspace_data, &agent1);
+                else
+                    move = get_action_exploit(userspace_data, &agent2);
+                if (move >= 0 && move < 16)
+                    user_control(userspace_data, (uint8_t) move, &display_buf);
+                else
+                    break;
+
             } else
                 mod_control(userspace_data, &display_buf);
 

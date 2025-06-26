@@ -12,7 +12,7 @@ all: kmod xo-user xo-train
 kmod: $(GIT_HOOKS) main.c
 	$(MAKE) -C $(KDIR) M=$(PWD) modules
 
-xo-user: xo-user.c history.c
+xo-user: xo-user.c history.c rl/reinforcement_learning.c
 	$(CC) $(ccflags-y) -o $@ $^
 
 xo-train: xo-train.c history.c rl/train.c rl/reinforcement_learning.c

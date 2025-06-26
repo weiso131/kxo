@@ -25,7 +25,8 @@ static Userspace *init_userspace(int device_fd,
     Userspace *new_data = (Userspace *) malloc(sizeof(Userspace));
     if (!new_data)
         goto malloc_fail;
-    if (get_user_id(device_fd, new_data->user_id, player1, player2) < 0)
+    if (get_user_id(device_fd, new_data->user_id, (player1 & 15),
+                    (player2 & 15)) < 0)
         goto get_user_id_fail;
     new_data->device_fd = device_fd;
     new_data->board = 0;
