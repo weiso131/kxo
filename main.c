@@ -358,7 +358,7 @@ static int __init kxo_init(void)
     }
 
     /* Create the workqueue */
-    kxo_workqueue = alloc_workqueue("kxod", WQ_UNBOUND, WQ_MAX_ACTIVE);
+    kxo_workqueue = alloc_workqueue("kxod", WQ_CPU_INTENSIVE, WQ_MAX_ACTIVE);
     if (!kxo_workqueue) {
         ret = -ENOMEM;
         goto error_workqueue;
