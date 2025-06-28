@@ -9,21 +9,29 @@
 
 #define MAX_SEARCH_DEPTH 6
 
-static negamax_context_t *current_ctx = NULL;
-static DEFINE_SPINLOCK(negamax_lock);
-
-static int cmp_moves(const void *a, const void *b)
+static void n_swap(int *a, int *b)
 {
-    const int *_a = (int *) a, *_b = (int *) b;
-    int score_a = 0, score_b = 0;
+    int tmp = *a;
+    *a = *b;
+    *b = tmp;
+}
+static void negamax_sort(negamax_context_t *ctx, int *moves, int n_moves)
+{
+    for (int i = 0; i < n_moves - 1; i++) {
+        for (int j = i + 1; j < n_moves; j++) {
+            int score_i = 0, score_j = 0;
 
-    if (current_ctx->history_count[*_a])
-        score_a = current_ctx->history_score_sum[*_a] /
-                  current_ctx->history_count[*_a];
-    if (current_ctx->history_count[*_b])
-        score_b = current_ctx->history_score_sum[*_b] /
-                  current_ctx->history_count[*_b];
-    return score_b - score_a;
+            if (ctx->history_count[moves[i]])
+                score_i = ctx->history_score_sum[moves[i]] /
+                          ctx->history_count[moves[i]];
+            if (ctx->history_count[moves[j]])
+                score_j = ctx->history_score_sum[moves[j]] /
+                          ctx->history_count[moves[j]];
+
+            if (score_j > score_i)
+                n_swap(&moves[i], &moves[j]);
+        }
+    }
 }
 
 static move_t negamax(negamax_context_t *ctx,
@@ -48,15 +56,11 @@ static move_t negamax(negamax_context_t *ctx,
     while (n_moves < N_GRIDS && moves[n_moves] != -1)
         ++n_moves;
 
-    spin_lock(&negamax_lock);
-    current_ctx = ctx;
-    sort(moves, n_moves, sizeof(int), cmp_moves, NULL);
-    current_ctx = NULL;
-    spin_unlock(&negamax_lock);
+    negamax_sort(ctx, moves, n_moves);
 
     for (int i = 0; i < n_moves; i++) {
         table[moves[i]] = player;
-        ctx->hash_value ^= zobrist_table[moves[i]][player == 'X'];
+        ctx->hash_value ^= ctx->zobrist_table[moves[i]][player == 'X'];
         if (!i)
             score = -negamax(ctx, table, depth - 1, player == 'X' ? 'O' : 'X',
                              -beta, -alpha)
@@ -77,7 +81,7 @@ static move_t negamax(negamax_context_t *ctx,
             best_move.move = moves[i];
         }
         table[moves[i]] = ' ';
-        ctx->hash_value ^= zobrist_table[moves[i]][player == 'X'];
+        ctx->hash_value ^= ctx->zobrist_table[moves[i]][player == 'X'];
         if (score > alpha)
             alpha = score;
         if (alpha >= beta)
@@ -91,7 +95,8 @@ static move_t negamax(negamax_context_t *ctx,
 
 void negamax_init(void)
 {
-    zobrist_init();
+    negamax_context_t ctx;
+    zobrist_init(&ctx);
 }
 
 move_t negamax_predict(char *table, char player)
