@@ -9,7 +9,8 @@ typedef struct {
     int history_count[N_GRIDS];
     u64 hash_value;
     u64 zobrist_table[N_GRIDS][2];
+    struct hlist_head *hash_table;
 } negamax_context_t;
 
-void negamax_init(void);
-move_t negamax_predict(char *table, char player);
+void negamax_init(negamax_context_t *ctx);
+move_t negamax_predict(negamax_context_t *ctx, char *table, char player);

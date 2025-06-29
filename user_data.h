@@ -7,6 +7,7 @@
 #include <linux/vmalloc.h>
 #include <linux/wait.h>
 #include <linux/workqueue.h>
+#include "negamax.h"
 
 #include "game.h"
 

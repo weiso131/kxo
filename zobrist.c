@@ -4,8 +4,6 @@
 
 #define HASH(key) ((key) % HASH_TABLE_SIZE)
 
-static struct hlist_head *hash_table;
-
 /* See https://github.com/wangyi-fudan/wyhash
  */
 static inline u64 wyhash64_stateless(u64 *seed)
@@ -32,51 +30,51 @@ void zobrist_init(negamax_context_t *ctx)
         ctx->zobrist_table[i][0] = wyhash64();
         ctx->zobrist_table[i][1] = wyhash64();
     }
-    hash_table =
+    ctx->hash_table =
         kmalloc(sizeof(struct hlist_head) * HASH_TABLE_SIZE, GFP_KERNEL);
-    if (!hash_table) {
+    if (!ctx->hash_table) {
         pr_info("kxo: Failed to allocate space for hash_table\n");
         return;
     }
     for (i = 0; i < HASH_TABLE_SIZE; i++)
-        INIT_HLIST_HEAD(&hash_table[i]);
+        INIT_HLIST_HEAD(&(ctx->hash_table[i]));
 }
 
-zobrist_entry_t *zobrist_get(u64 key)
+zobrist_entry_t *zobrist_get(negamax_context_t *ctx, u64 key)
 {
     unsigned long long hash_key = HASH(key);
 
-    if (hlist_empty(&hash_table[hash_key]))
+    if (hlist_empty(&(ctx->hash_table[hash_key])))
         return NULL;
 
     zobrist_entry_t *entry = NULL;
 
-    hlist_for_each_entry(entry, &hash_table[hash_key], ht_list) {
+    hlist_for_each_entry(entry, &(ctx->hash_table[hash_key]), ht_list) {
         if (entry->key == key)
             return entry;
     }
     return NULL;
 }
 
-void zobrist_put(u64 key, int score, int move)
+void zobrist_put(negamax_context_t *ctx, u64 key, int score, int move)
 {
     unsigned long long hash_key = HASH(key);
     zobrist_entry_t *new_entry = kmalloc(sizeof(zobrist_entry_t), GFP_KERNEL);
     new_entry->key = key;
     new_entry->move = move;
     new_entry->score = score;
-    hlist_add_head(&new_entry->ht_list, &hash_table[hash_key]);
+    hlist_add_head(&new_entry->ht_list, &(ctx->hash_table[hash_key]));
 }
 
-void zobrist_clear(void)
+void zobrist_clear(negamax_context_t *ctx)
 {
     for (int i = 0; i < HASH_TABLE_SIZE; i++) {
-        while (!hlist_empty(&hash_table[i])) {
-            zobrist_entry_t *entry =
-                hlist_entry(hash_table[i].first, zobrist_entry_t, ht_list);
+        while (!hlist_empty(&(ctx->hash_table[i]))) {
+            zobrist_entry_t *entry = hlist_entry((ctx->hash_table[i]).first,
+                                                 zobrist_entry_t, ht_list);
             hlist_del(&entry->ht_list);
             kfree(entry);
         }
-        INIT_HLIST_HEAD(&hash_table[i]);
+        INIT_HLIST_HEAD(&(ctx->hash_table[i]));
     }
 }

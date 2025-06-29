@@ -39,9 +39,15 @@ static int delay = 100; /* time (in ms) to generate an event */
 
 static int negamax_move(const char *table, char player)
 {
+    negamax_context_t *ctx = kmalloc(sizeof(negamax_context_t), GFP_KERNEL);
+    if (!ctx) {
+        printk("kxo: Failed to allocate negamax_context\n");
+        return -1;
+    }
+    negamax_init(ctx);
     char table_copy[16];
     memcpy(table_copy, table, N_GRIDS);
-    return negamax_predict(table_copy, player).move;
+    return negamax_predict(ctx, table_copy, player).move;
 }
 
 
@@ -316,8 +322,6 @@ static int __init kxo_init(void)
     int ret;
 
     init_namespace();
-
-    negamax_init();
     mcts_init();
 
     /* Register major/minor numbers */
