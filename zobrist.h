@@ -1,12 +1,13 @@
 #pragma once
 
 #include <linux/list.h>
+#include "negamax.h"
 
 #include "game.h"
 
 #define HASH_TABLE_SIZE (100003)
 
-extern u64 zobrist_table[N_GRIDS][2];
+// extern u64 zobrist_table[N_GRIDS][2];
 
 typedef struct {
     u64 key;
@@ -15,7 +16,7 @@ typedef struct {
     struct hlist_node ht_list;
 } zobrist_entry_t;
 
-void zobrist_init(void);
+void zobrist_init(negamax_context_t *ctx);
 zobrist_entry_t *zobrist_get(u64 key);
 void zobrist_put(u64 key, int score, int move);
 void zobrist_clear(void);

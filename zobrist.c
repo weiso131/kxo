@@ -2,8 +2,6 @@
 
 #include "zobrist.h"
 
-u64 zobrist_table[N_GRIDS][2];
-
 #define HASH(key) ((key) % HASH_TABLE_SIZE)
 
 static struct hlist_head *hash_table;
@@ -27,12 +25,12 @@ static u64 wyhash64(void)
     return wyhash64_stateless(&seed);
 }
 
-void zobrist_init(void)
+void zobrist_init(negamax_context_t *ctx)
 {
     int i;
     for (i = 0; i < N_GRIDS; i++) {
-        zobrist_table[i][0] = wyhash64();
-        zobrist_table[i][1] = wyhash64();
+        ctx->zobrist_table[i][0] = wyhash64();
+        ctx->zobrist_table[i][1] = wyhash64();
     }
     hash_table =
         kmalloc(sizeof(struct hlist_head) * HASH_TABLE_SIZE, GFP_KERNEL);
