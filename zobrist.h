@@ -17,6 +17,6 @@ typedef struct {
 } zobrist_entry_t;
 
 void zobrist_init(negamax_context_t *ctx);
-zobrist_entry_t *zobrist_get(u64 key);
-void zobrist_put(u64 key, int score, int move);
-void zobrist_clear(void);
+zobrist_entry_t *zobrist_get(negamax_context_t *ctx, u64 key);
+void zobrist_put(negamax_context_t *ctx, u64 key, int score, int move);
+void zobrist_clear(negamax_context_t *ctx);

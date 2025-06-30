@@ -45,7 +45,7 @@ static move_t negamax(negamax_context_t *ctx,
         move_t result = {get_score(table, player), -1};
         return result;
     }
-    const zobrist_entry_t *entry = zobrist_get(ctx->hash_value);
+    const zobrist_entry_t *entry = zobrist_get(ctx, ctx->hash_value);
     if (entry)
         return (move_t){.score = entry->score, .move = entry->move};
 
@@ -89,24 +89,24 @@ static move_t negamax(negamax_context_t *ctx,
     }
 
     kfree((char *) moves);
-    zobrist_put(ctx->hash_value, best_move.score, best_move.move);
+    zobrist_put(ctx, ctx->hash_value, best_move.score, best_move.move);
     return best_move;
 }
 
-void negamax_init(void)
+void negamax_init(negamax_context_t *ctx)
 {
-    negamax_context_t ctx;
-    zobrist_init(&ctx);
+    zobrist_init(ctx);
 }
 
-move_t negamax_predict(char *table, char player)
+move_t negamax_predict(negamax_context_t *ctx, char *table, char player)
 {
-    negamax_context_t ctx;
-    memset(&ctx, 0, sizeof(ctx));
+    memset(&ctx->history_score_sum[0], 0, sizeof(int) * N_GRIDS);
+    memset(&ctx->history_count[0], 0, sizeof(int) * N_GRIDS);
+    ctx->hash_value = 0;
     move_t result;
     for (int depth = 2; depth <= MAX_SEARCH_DEPTH; depth += 2) {
-        result = negamax(&ctx, table, depth, player, -100000, 100000);
-        zobrist_clear();
+        result = negamax(ctx, table, depth, player, -100000, 100000);
+        zobrist_clear(ctx);
     }
     return result;
 }
