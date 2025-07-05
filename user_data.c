@@ -78,7 +78,7 @@ UserData *init_user_data(ai_func_t ai1_func, ai_func_t ai2_func)
         goto user_data_alloc_fail;
 
     reset_user_data_table(user_data);
-    atomic_set(&user_data->unuse, 0);
+    WRITE_ONCE(user_data->unuse, 0);
     user_data->ai1_func = ai1_func;
     user_data->ai2_func = ai2_func;
 

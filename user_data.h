@@ -17,7 +17,7 @@ typedef int (*ai_func_t)(const char *table, char turn);
 typedef struct user_data {
     char table[16];
     char turn;           //'O' or 'X'
-    atomic_t unuse;      // tasklet function will release user_data if unuse
+    char unuse;          // tasklet function will release user_data if unuse
     ai_func_t ai1_func;  //'O', if NULL mean user space control
     ai_func_t ai2_func;  //'X', if NULL mean user space control
 

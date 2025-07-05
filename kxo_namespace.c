@@ -61,7 +61,7 @@ int delete_tid_data(pid_t tid)
 
     for (int i = 0; i < USER_MAX; i++)
         if (data->user_data_list[i] != NULL)
-            atomic_set(&data->user_data_list[i]->unuse, 1);
+            WRITE_ONCE(data->user_data_list[i]->unuse, 1);
 
     vfree(data);
 
@@ -116,7 +116,7 @@ void user_list_queue_work(struct workqueue_struct *wq)
     lf_list_for_each_safe(now, nxt, &user_list_head)
     {
         UserData *user_data = container_of(now, UserData, hlist);
-        if (!atomic_read(&user_data->unuse)) {
+        if (!READ_ONCE(user_data->unuse)) {
             if (get_turn_function(user_data))
                 queue_work(wq, &user_data->work);
             last = now;
