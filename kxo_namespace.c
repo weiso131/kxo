@@ -8,11 +8,9 @@ struct kxo_namespace {
 };
 
 struct kxo_namespace kxo_namespace[NAMESPACE_MAX];
-struct hlist_head user_list_head;
-struct hlist_head trash_list_head;
+struct lf_list user_list_head;
+struct lf_list trash_list_head;
 
-static DEFINE_SPINLOCK(user_list_lock);
-unsigned long user_list_flags;
 
 void init_namespace(void)
 {
@@ -20,8 +18,8 @@ void init_namespace(void)
         INIT_HLIST_HEAD(&kxo_namespace[i].head);
         rwlock_init(&kxo_namespace[i].lock);
     }
-    INIT_HLIST_HEAD(&user_list_head);
-    INIT_HLIST_HEAD(&trash_list_head);
+    lf_list_init(&user_list_head);
+    lf_list_init(&trash_list_head);
 }
 
 int add_tid_data(pid_t tid)
@@ -93,9 +91,7 @@ int add_user(pid_t tid, ai_func_t ai1_func, ai_func_t ai2_func)
         return -1;
     for (int i = 0; i < USER_MAX; i++) {
         if (cmpxchg((tid_data->user_data_list + i), NULL, user_data) == NULL) {
-            spin_lock_irqsave(&user_list_lock, user_list_flags);
-            hlist_add_head(&user_data->hlist, &user_list_head);
-            spin_unlock_irqrestore(&user_list_lock, user_list_flags);
+            lf_list_add_head(&user_list_head, &user_data->hlist);
             return i;
         }
     }
@@ -116,40 +112,36 @@ UserData *get_user_data(pid_t tid, int user_id)
 
 void user_list_queue_work(struct workqueue_struct *wq)
 {
-    spin_lock_irqsave(&user_list_lock, user_list_flags);
-    UserData *user_data =
-        hlist_entry_safe(user_list_head.first, UserData, hlist);
-    spin_unlock_irqrestore(&user_list_lock, user_list_flags);
-
-    while (1) {
-        pr_info("kxo: user_data_ptr: %p\n", user_data);
-        if (!user_data)
-            break;
-        struct hlist_node *n = user_data->hlist.next;
-
+    struct lf_list *now = NULL, *nxt = NULL, *last = &user_list_head;
+    lf_list_for_each_safe(now, nxt, &user_list_head)
+    {
+        UserData *user_data = container_of(now, UserData, hlist);
         if (!atomic_read(&user_data->unuse)) {
             if (get_turn_function(user_data))
                 queue_work(wq, &user_data->work);
+            last = now;
         } else {
-            hlist_del(&user_data->hlist);
-            hlist_add_head(&user_data->hlist, &trash_list_head);
+            lf_list_remove(last, now, &user_list_head);
+            lf_list_add_head(&trash_list_head, now);
         }
-        user_data = hlist_entry_safe(n, UserData, hlist);
     }
 }
 
 void release_namespace(void)
 {
-    UserData *pos = NULL;
-    struct hlist_node *n;
-    hlist_for_each_entry_safe(pos, n, &user_list_head, hlist)
+    struct lf_list *now = NULL, *nxt = NULL, *last = &user_list_head;
+    lf_list_for_each_safe(now, nxt, &user_list_head)
     {
-        hlist_del(&pos->hlist);
-        release_user_data(&pos);
+        UserData *user_data = container_of(now, UserData, hlist);
+        lf_list_remove(last, now, &user_list_head);
+        release_user_data(&user_data);
+        last = now;
     }
-    hlist_for_each_entry_safe(pos, n, &trash_list_head, hlist)
+    lf_list_for_each_safe(now, nxt, &trash_list_head)
     {
-        hlist_del(&pos->hlist);
-        release_user_data(&pos);
+        UserData *user_data = container_of(now, UserData, hlist);
+        lf_list_remove(last, now, &trash_list_head);
+        release_user_data(&user_data);
+        last = now;
     }
 }

@@ -10,6 +10,7 @@
 #include "negamax.h"
 
 #include "game.h"
+#include "lock_free_list.h"
 
 typedef int (*ai_func_t)(const char *table, char turn);
 
@@ -27,7 +28,7 @@ typedef struct user_data {
     /* Wait queue to implement blocking I/O from userspace */
     struct wait_queue_head rx_wait;
 
-    struct hlist_node hlist;
+    struct lf_list hlist;
 } UserData;
 
 UserData *init_user_data(ai_func_t ai1_func, ai_func_t ai2_func);
