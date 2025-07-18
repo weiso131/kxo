@@ -30,6 +30,8 @@ int add_tid_data(pid_t tid)
     data->user_data_list = (UserData **) vmalloc(sizeof(UserData *) * USER_MAX);
     for (int i = 0; i < USER_MAX; i++)
         data->user_data_list[i] = NULL;
+    init_waitqueue_head(&data->tid_wait);
+    data->user_cnt = 0;
 
     if (!data->user_data_list)
         goto user_list_fail;
@@ -63,8 +65,6 @@ int delete_tid_data(pid_t tid)
         if (data->user_data_list[i] != NULL)
             WRITE_ONCE(data->user_data_list[i]->unuse, 1);
 
-    vfree(data);
-
     return 0;
 }
 
@@ -85,13 +85,14 @@ TidData *find_tid_data(pid_t tid)
 int add_user(pid_t tid, ai_func_t ai1_func, ai_func_t ai2_func)
 {
     TidData *tid_data = find_tid_data(tid);
-    UserData *user_data = init_user_data(ai1_func, ai2_func);
+    UserData *user_data = init_user_data(ai1_func, ai2_func, tid_data);
     pr_info("kxo: real user_data: %p\n", user_data);
     if (!user_data)
         return -1;
     for (int i = 0; i < USER_MAX; i++) {
         if (cmpxchg((tid_data->user_data_list + i), NULL, user_data) == NULL) {
             lf_list_add_head(&user_list_head, &user_data->hlist);
+            tid_data->user_cnt++;
             return i;
         }
     }
@@ -123,6 +124,9 @@ void user_list_queue_work(struct workqueue_struct *wq)
         } else {
             lf_list_remove(last, now, &user_list_head);
             lf_list_add_head(&trash_list_head, now);
+            user_data->tid_data->user_cnt--;
+            if (user_data->tid_data->user_cnt == 0)
+                vfree(user_data->tid_data);
         }
     }
 }

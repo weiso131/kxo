@@ -5,6 +5,7 @@
 #include <linux/interrupt.h>
 #include <linux/kfifo.h>
 #include <linux/module.h>
+#include <linux/poll.h>
 #include <linux/sched.h>
 #include <linux/sched/signal.h>
 #include <linux/slab.h>
@@ -218,7 +219,8 @@ static ssize_t kxo_read(struct file *file,
             ret = -EAGAIN;
             break;
         }
-        ret = wait_event_interruptible(user_data->rx_wait,
+        pr_info("kxo: read_wait");
+        ret = wait_event_interruptible(user_data->tid_data->tid_wait,
                                        kfifo_len(&user_data->user_fifo));
     } while (ret == 0);
 
@@ -268,6 +270,25 @@ static ssize_t kxo_write(struct file *file,
     return 0;
 }
 
+static __poll_t kxo_poll(struct file *filp, struct poll_table_struct *wait)
+{
+    __poll_t mask = 0;
+    TidData *tid_data = find_tid_data(current->pid);
+    poll_wait(filp, &tid_data->tid_wait, wait);
+
+    for (int i = 0; i < USER_MAX; i++) {
+        if (tid_data->user_data_list[i] != NULL) {
+            UserData *user_data = tid_data->user_data_list[i];
+            if (kfifo_len(&user_data->user_fifo)) {
+                mask |= EPOLLRDNORM | EPOLLIN;
+                break;
+            }
+        }
+    }
+
+    return mask;
+}
+
 static atomic_t open_cnt;
 
 static int kxo_open(struct inode *inode, struct file *filp)
@@ -307,7 +328,8 @@ static const struct file_operations kxo_fops = {
     .llseek = no_llseek,
     .open = kxo_open,
     .release = kxo_release,
-    .unlocked_ioctl = kxo_ioctl};
+    .unlocked_ioctl = kxo_ioctl,
+    .poll = kxo_poll};
 
 static char *kxo_devnode(const struct device *dev, umode_t *mode)
 {

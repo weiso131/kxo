@@ -57,7 +57,7 @@ static void ai_work_func(struct work_struct *w)
 
     smp_mb();
 
-    wake_up_interruptible(&user_data->rx_wait);
+    wake_up_interruptible(&user_data->tid_data->tid_wait);
 
     if (win != ' ')
         reset_user_data_table(user_data);
@@ -70,7 +70,9 @@ null_func:
             (unsigned long long) nsecs >> 10);
 }
 
-UserData *init_user_data(ai_func_t ai1_func, ai_func_t ai2_func)
+UserData *init_user_data(ai_func_t ai1_func,
+                         ai_func_t ai2_func,
+                         TidData *tid_data)
 {
     UserData *user_data = vmalloc(sizeof(UserData));
 
@@ -81,10 +83,9 @@ UserData *init_user_data(ai_func_t ai1_func, ai_func_t ai2_func)
     WRITE_ONCE(user_data->unuse, 0);
     user_data->ai1_func = ai1_func;
     user_data->ai2_func = ai2_func;
+    user_data->tid_data = tid_data;
 
     INIT_WORK(&user_data->work, ai_work_func);
-
-    init_waitqueue_head(&user_data->rx_wait);
 
     if (kfifo_alloc(&user_data->user_fifo, PAGE_SIZE, GFP_KERNEL) < 0)
         goto kfifo_alloc_fail;

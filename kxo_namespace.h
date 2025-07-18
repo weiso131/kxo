@@ -3,13 +3,8 @@
 #include <linux/list.h>
 #include <linux/sched.h>
 #include <linux/sched/signal.h>
+#include "type.h"
 #include "user_data.h"
-
-typedef struct tid_data {
-    pid_t tid;
-    UserData **user_data_list;
-    struct hlist_node hlist;
-} TidData;
 
 #define NAMESPACE_MAX 256
 #define USER_MAX 32
