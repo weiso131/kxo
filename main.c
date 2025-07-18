@@ -5,6 +5,7 @@
 #include <linux/interrupt.h>
 #include <linux/kfifo.h>
 #include <linux/module.h>
+#include <linux/poll.h>
 #include <linux/slab.h>
 #include <linux/sysfs.h>
 #include <linux/version.h>
@@ -380,6 +381,18 @@ static void timer_handler(struct timer_list *__timer)
     local_irq_enable();
 }
 
+static __poll_t kxo_poll(struct file *filp, struct poll_table_struct *wait)
+{
+    __poll_t mask = 0;
+
+    poll_wait(filp, &rx_wait, wait);
+
+    if (kfifo_len(&rx_fifo))
+        mask |= EPOLLRDNORM | EPOLLIN;
+
+    return mask;
+}
+
 static ssize_t kxo_read(struct file *file,
                         char __user *buf,
                         size_t count,
@@ -449,7 +462,7 @@ static const struct file_operations kxo_fops = {
     .llseek = no_llseek,
     .open = kxo_open,
     .release = kxo_release,
-};
+    .poll = kxo_poll};
 
 static int __init kxo_init(void)
 {
