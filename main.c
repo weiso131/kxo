@@ -293,11 +293,9 @@ static void game_tasklet_func(unsigned long __data)
 
     if (finish && turn == 'O') {
         WRITE_ONCE(finish, 0);
-        smp_wmb();
         queue_work(kxo_workqueue, &ai_one_work);
     } else if (finish && turn == 'X') {
         WRITE_ONCE(finish, 0);
-        smp_wmb();
         queue_work(kxo_workqueue, &ai_two_work);
     }
     queue_work(kxo_workqueue, &drawboard_work);
