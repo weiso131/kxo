@@ -325,7 +325,9 @@ static const struct file_operations kxo_fops = {
 #endif
     .read = kxo_read,
     .write = kxo_write,
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 12, 0)
     .llseek = no_llseek,
+#endif
     .open = kxo_open,
     .release = kxo_release,
     .unlocked_ioctl = kxo_ioctl,
