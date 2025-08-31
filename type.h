@@ -4,6 +4,7 @@
 #include <linux/list.h>
 #include <linux/wait.h>
 #include <linux/workqueue.h>
+#include "lock_free_list.h"
 
 typedef int (*ai_func_t)(const char *table, char turn);
 

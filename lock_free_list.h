@@ -1,5 +1,4 @@
-#ifndef LOCK_FREE_LIST_H
-#define LOCK_FREE_LIST
+#pragma once
 
 #include <asm/cmpxchg.h>
 #include <linux/compiler.h>
@@ -41,5 +40,3 @@ static inline struct lf_list *lf_list_remove(struct lf_list *last,
                                             1;               \
                                         });                  \
          now = nxt)
-
-#endif
