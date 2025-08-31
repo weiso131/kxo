@@ -457,7 +457,9 @@ static const struct file_operations kxo_fops = {
     .owner = THIS_MODULE,
 #endif
     .read = kxo_read,
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 12, 0)
     .llseek = no_llseek,
+#endif
     .open = kxo_open,
     .release = kxo_release,
     .poll = kxo_poll};
